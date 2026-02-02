@@ -15,6 +15,8 @@ This project is NOT COMPLETE. Attempting to run it will give you...nothing.
 
 After a functional release, we will update this part.
 
+Currently this app is being developed on and will only work on linux, as it hooks to V4L2 Loopback. If you HAVE to use this, modprobe a new virtual device on /dev/video1 (add option to change this)
+
 # Notes for future
 
 What’s Done:
