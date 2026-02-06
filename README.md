@@ -15,23 +15,16 @@ This project is NOT COMPLETE. Attempting to run it will give you...nothing.
 
 After a functional release, we will update this part.
 
-Currently this app is being developed on and will only work on linux, as it hooks to V4L2 Loopback. If you HAVE to use this, modprobe a new virtual device on /dev/video1 (add option to change this)
-
 # Notes for future
 
 What’s Done:
 
-Merged ui files for one seamless gui
-refactored code into multiple files
-old code stored in a folder for reference (required for tab_main.py functionality)
+main_tab has majority of its options linked. the few left are the ones which would require a bit of "thinking"
 
 Currently Pending:
 
-Audio options, connection with mobile, better logging and error handling
-tab_main.py functionality
-tab_settings.py functionality + ui
-tab_about.py functionality + ui
+better logging and error handling
+about and settings tab ui
+few options in main and cammy tab currently do not have functionality and needs to be done.
 
-Add options in settings to change theme of ui. Current GUI defaults to Fusion theme instead of the system Breeze theme. 
-Unable to make pyqt use breeze theme unless adding device specific code. One way to counter is to use QSS files for the ui. 
-Would even provide consistent ui across different devices but cannot find good ones. Will take time to find good ones or will have to write our own (too hectic tbh). First option is to find some online but if nothing works, we may have to make one ourselves.
+Discovered about toml files which we can use to setup the dependencies and all. Need to check it out and replace the current dependencies.txtw
