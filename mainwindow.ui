@@ -41,8 +41,8 @@
          <rect>
           <x>4</x>
           <y>0</y>
-          <width>421</width>
-          <height>721</height>
+          <width>341</width>
+          <height>601</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayoutLeft">
@@ -56,16 +56,23 @@
              <widget class="QListWidget" name="listADBDevices"/>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_2">
+             <widget class="QPushButton" name="refreshButtonADB">
               <property name="text">
                <string>Refresh Devices</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="connectButtonADB">
               <property name="text">
                <string>Connect</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="disconnectButtonADB">
+              <property name="text">
+               <string>Disconnect</string>
               </property>
              </widget>
             </item>
@@ -108,36 +115,16 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_5">
+          <widget class="QPushButton" name="buttonStopScrcpy">
            <property name="text">
             <string>Stop scrcpy</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QRadioButton" name="radioButton">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
+          <widget class="QPushButton" name="switchToTCPIP">
            <property name="text">
-            <string>USB</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QRadioButton" name="radioButton_2">
-           <property name="text">
-            <string>TCP/IP</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="linePort">
-           <property name="placeholderText">
-            <string>Enter TCP/IP port</string>
+            <string>Switch to TCP/IP</string>
            </property>
           </widget>
          </item>
