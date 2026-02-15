@@ -1,21 +1,24 @@
 import json
 import cv2
+import numpy as np
 from PyQt6 import QtGui, QtCore
 from PyQt6.QtWidgets import QFileDialog
+from ultralytics import YOLO
+import time
+import pyvirtualcam
 
+# Comments specially for my bbg RudyDaBot ;)
+# also read the guide for virtual cam.txt ;)
 
 class TabCammy:
     def __init__(self, ui):
         self.ui = ui
 
         cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FPS,          9999999)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  9999999)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 9999999)
 
         self.maxFPS = cap.get(cv2.CAP_PROP_FPS)
-        self.maxW   = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.maxH   = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.maxW = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.maxH = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         cap.release()
 
         self.cap = None
@@ -41,12 +44,30 @@ class TabCammy:
         self.ui.checkBoxMirror_xaxis.stateChanged.connect(self._update_mirror_x)
         self.ui.checkBoxMirror_yaxis.stateChanged.connect(self._update_mirror_y)
 
+        self.model = YOLO("src/model.pt") # initialize model. u should understand this i believe so
+        self.detection_interval = 1 # My laptop lags when each and every frame updates. Every nth frame will be processed by the CNN model update where n will be the value of this
+        self.frame_count = 0        # counts frames.
+        self.last_cx = None         # saves previous center position - x
+        self.last_cy = None         # saves previous center position - y
+        
+        self.virtual_cam = None     # Virtual cam obj
+        self.virtual_cam_enabled = True # Variable to enable virtual cam or disable it.
 
     def _start_camera(self):
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.resolution[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self.timer.start(int(1000 / self.fps))
+
+        # Pretty self explanatory. Also there is a bug that the virtual cam is resized to 4:3 ratio. I can't seem to find the problem so do check it out ;)
+        if self.virtual_cam_enabled:
+            self.virtual_cam = pyvirtualcam.Camera(
+                width=self.resolution[0], 
+                height=self.resolution[1], 
+                fps=int(self.fps),
+                fmt=pyvirtualcam.PixelFormat.RGB
+            )
+            self.ui.textEditStatus.append("VirtualCamera started") 
 
         self.ui.textEditStatus.append("Camera started")
         self.ui.btnConnect.setEnabled(False)
@@ -57,6 +78,11 @@ class TabCammy:
         if self.cap:
             self.cap.release()
             self.cap = None
+        
+        if self.virtual_cam is not None:
+            self.virtual_cam.close()
+            self.virtual_cam = None
+        
         self.ui.labelVideoPreview.clear()
         self.ui.textEditStatus.append("Camera stopped")
         self.ui.btnConnect.setEnabled(True)
@@ -64,6 +90,7 @@ class TabCammy:
 
 
     def _update_frame(self):
+        start = time.perf_counter()
         if not self.cap:
             return
 
@@ -72,12 +99,24 @@ class TabCammy:
             return
 
         frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        
+        self.frame_count += 1
+        if self.frame_count % self.detection_interval == 0:
 
-        # aspect ratio crop
+            results = self.model(frame, verbose=False) # Returns Results objects in a list. The different elements of this results list point to different detected objects
+            if len(results[0].boxes) > 0: # results[n].boxes is a boxes object. Contains methods like xyxy, xywh, etc.
+                # xyxy would return xy coordinates of both left upper corner and right lower corner gives a tensor [x1, y1, x2, y2] (i dont know what tensors are so dont ask me) 1 is the upper left one, 2 is the bottom right one
+                box = results[0].boxes[0].xyxy[0].cpu().numpy() # our model processing happening in GPU by default but numpy operates in CPU. so .cpu() will move it to cpu memory and .numpy() will convert it to numpy array
+                x1, y1, x2, y2 = map(int, box)
+                self.last_cx = (x1 + x2) // 2 # mid point
+                self.last_cy = (y1 + y2) // 2 # mid point
+        
+        if self.last_cx is not None and self.last_cy is not None:
+            frame = self._center_crop(frame, self.last_cx, self.last_cy)
+
         if self.aspectRatio and self.aspectRatio != "Auto":
             frame = self._change_image_ratio(frame).copy()
 
-        # mirror
         flip_code = None
         if self.mirror_xaxis and self.mirror_yaxis:
             flip_code = -1
@@ -88,19 +127,45 @@ class TabCammy:
         if flip_code is not None:
             frame = cv2.flip(frame, flip_code)
 
+        frame = np.ascontiguousarray(frame) # I dont really understand it but it will store the frame as a contiguous block of memory but we need contiguous array to be used as a frame.otherwise boom. error.
+        
+        if self.virtual_cam is not None:
+            if frame.shape[1] != self.resolution[0] or frame.shape[0] != self.resolution[1]:
+                frame_resized = cv2.resize(frame, (self.resolution[0], self.resolution[1]))
+            else:
+                frame_resized = frame
+            self.virtual_cam.send(frame_resized)
+        
         h, w, ch = frame.shape
-        qimg = QtGui.QImage(frame.data, w, h, w * ch, QtGui.QImage.Format.Format_RGB888)
+        qimg = QtGui.QImage(frame.data, w, h, w * ch, QtGui.QImage.Format.Format_RGB888).copy() # I honestly don't understand what the fuck is going on here. I copied this off stackoverflow
         self.ui.labelVideoPreview.setPixmap(
             QtGui.QPixmap.fromImage(qimg).scaled(
                 self.ui.labelVideoPreview.size(),
                 QtCore.Qt.AspectRatioMode.KeepAspectRatio
             )
         )
+        print(time.perf_counter() - start)
+
+    def _center_crop(self, frame, cx, cy):
+        # suppose values of cx cy and everythin else. U wil understand.
+        h, w, _ = frame.shape
+
+        crop_w = int(w/2)
+        crop_h = int(h/2)
+
+        x1 = max(0, cx - crop_w//2)
+        y1 = max(0, cy - crop_h//2)
+
+        x2 = min(w, x1 + crop_w)
+        y2 = min(h, y1 + crop_h)
+
+        return frame[y1:y2, x1:x2]
+
 
     def _change_image_ratio(self, frame):
         h, w, _ = frame.shape
-        parts         = self.aspectRatio.split(":")
-        target_ratio  = float(parts[0]) / float(parts[1])
+        parts = self.aspectRatio.split(":")
+        target_ratio = float(parts[0]) / float(parts[1])
         current_ratio = w / h
 
         if current_ratio > target_ratio:
